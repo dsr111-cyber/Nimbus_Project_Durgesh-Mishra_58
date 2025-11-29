@@ -1,14 +1,3 @@
-/* src/portfolio.c
- * Person A (feature/core)
- * Simple Portfolio skeleton (safer version, preserves external symbols)
- *
- * Notes:
- * - Keeps the original global symbols portfolio and count non-static
- *   so other files that reference them won't break.
- * - Improves input safety (fgets + parsing), validation, and string handling.
- * - Does not change any public function names or signatures.
- */
-
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
@@ -112,9 +101,8 @@ void metrics() {
     printf("Portfolio return  : %.2f%%\n", pct);
 }
 
-/* ---------- Placeholders for teammates to implement (do not modify) ---------- */
+/* ---------- Person B: BUY & SELL (safer implementations) ---------- */
 
-/* Person B will implement buying logic here */
 /* --------- Person B: BUY FUNCTION (safer implementation) ----------- */
 void buy() {
     char line[LINE_BUF];
@@ -125,6 +113,7 @@ void buy() {
     printf("Enter stock symbol: ");
     if (!get_line(line, sizeof(line))) return;
     if (strlen(line) == 0) { printf("No symbol entered.\n"); return; }
+    /* normalize symbol */
     snprintf(sym, sizeof(sym), "%s", line);
     strtoupper(sym);
 
@@ -216,19 +205,123 @@ void sell() {
     }
 }
 
-/* Person C will implement price updates here */
+/* ---------- Person C: Update prices, Save and Load implementations ---------- */
+
+/* --------- Person C: update_prices() --------- */
 void update_prices() {
-    printf("[Person C] update_prices() not implemented yet.\n");
+    char line[LINE_BUF];
+    char sym[SYMBOL_LEN];
+    double price;
+
+    printf("Enter symbol to update (or ALL): ");
+    if (!get_line(line, sizeof(line))) return;
+    if (strlen(line) == 0) { printf("No input.\n"); return; }
+
+    snprintf(sym, sizeof(sym), "%s", line);
+    strtoupper(sym);
+
+    if (strcmp(sym, "ALL") == 0) {
+        if (count == 0) { printf("Portfolio empty.\n"); return; }
+        for (int i = 0; i < count; ++i) {
+            printf("Enter current price for %s (cur %.2f): ", portfolio[i].symbol, portfolio[i].cur_price);
+            if (!get_line(line, sizeof(line))) { printf("Input error.\n"); return; }
+            if (strlen(line) == 0) { /* skip if blank */ continue; }
+            if (!parse_double(line, &price) || price <= 0.0) {
+                printf("Invalid price for %s, skipping.\n", portfolio[i].symbol);
+                continue;
+            }
+            portfolio[i].cur_price = price;
+        }
+        printf("All updates processed.\n");
+        return;
+    }
+
+    /* single symbol update */
+    int idx = find_index(sym);
+    if (idx < 0) {
+        printf("Symbol %s not found.\n", sym);
+        return;
+    }
+    printf("Enter current price for %s (cur %.2f): ", portfolio[idx].symbol, portfolio[idx].cur_price);
+    if (!get_line(line, sizeof(line))) { printf("Input error.\n"); return; }
+    if (!parse_double(line, &price) || price <= 0.0) {
+        printf("Invalid price.\n");
+        return;
+    }
+    portfolio[idx].cur_price = price;
+    printf("Updated %s current price to %.2f\n", portfolio[idx].symbol, portfolio[idx].cur_price);
 }
 
-/* Person C will implement save/load persistence here */
+/* --------- Person C: save_file() --------- */
+/* Save portfolio to a text file: one line per holding:
+   SYMBOL qty buy_price cur_price
+*/
 void save_file() {
-    printf("[Person C] save_file() not implemented yet.\n");
+    const char *fname = "portfolio.txt";
+    FILE *f = fopen(fname, "w");
+    if (!f) {
+        perror("Failed to open save file");
+        return;
+    }
+    for (int i = 0; i < count; ++i) {
+        /* write symbol qty buy_price cur_price */
+        fprintf(f, "%s %d %.10g %.10g\n",
+                portfolio[i].symbol,
+                portfolio[i].qty,
+                portfolio[i].buy_price,
+                portfolio[i].cur_price);
+    }
+    fclose(f);
+    printf("Portfolio saved to %s (%d entries).\n", fname, count);
 }
 
+/* --------- Person C: load_file() --------- */
+/* Load portfolio from text file. Clears current portfolio before loading.
+   Expects format per line: SYMBOL qty buy_price cur_price
+*/
 void load_file() {
-    printf("[Person C] load_file() not implemented yet.\n");
+    const char *fname = "portfolio.txt";
+    FILE *f = fopen(fname, "r");
+    if (!f) {
+        printf("No saved portfolio found (%s).\n", fname);
+        return;
+    }
+
+    char line[LINE_BUF];
+    char sym[SYMBOL_LEN];
+    int q;
+    double bp, cp;
+    int loaded = 0;
+
+    /* clear existing portfolio */
+    count = 0;
+
+    while (fgets(line, sizeof(line), f) != NULL) {
+        /* trim newline */
+        size_t ln = strlen(line); if (ln && line[ln-1] == '\n') line[ln-1] = '\0';
+        if (sscanf(line, "%15s %d %lf %lf", sym, &q, &bp, &cp) == 4) {
+            /* normalize symbol to uppercase */
+            strtoupper(sym);
+            if (count < MAX_STOCKS) {
+                snprintf(portfolio[count].symbol, SYMBOL_LEN, "%s", sym);
+                portfolio[count].qty = q;
+                portfolio[count].buy_price = bp;
+                portfolio[count].cur_price = cp;
+                ++count;
+                ++loaded;
+            } else {
+                printf("Warning: reached MAX_STOCKS, skipping %s\n", sym);
+            }
+        } else {
+            /* skip malformed lines */
+            continue;
+        }
+    }
+    fclose(f);
+    printf("Loaded %d entries from %s.\n", loaded, fname);
 }
+
+/* ---------- Person D: UI placeholder ---------- */
 
 /* Person D will implement UI improvements and docs */
 void ui_help() {
@@ -250,7 +343,8 @@ int menu() {
 /* main loop */
 int main(void) {
     int choice;
-    /* load_file();  -- Person C will implement persistence later */
+    /* load_file();  -- Person C will implement persistence later (already implemented) */
+    load_file(); /* optional: automatically attempt to load at start */
     while ((choice = menu()) != 0) {
         switch (choice) {
             case 1: view(); break;
@@ -263,7 +357,8 @@ int main(void) {
             default: printf("Invalid choice.\n"); break;
         }
     }
-    /* save_file(); -- Person C will enable this later */
+    /* save_file(); -- optionally enabled */
+    save_file();
     printf("Goodbye!\n");
-    return 0;
+    return 0;
 }
