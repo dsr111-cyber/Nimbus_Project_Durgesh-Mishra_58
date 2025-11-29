@@ -1,0 +1,7 @@
+# binaries
+/portfolio
+*.o
+
+# editor files
+*.swp
+.DS_Store
