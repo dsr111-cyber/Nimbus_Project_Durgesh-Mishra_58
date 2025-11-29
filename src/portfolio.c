@@ -1,14 +1,3 @@
-/* src/portfolio.c
- * Person A (feature/core)
- * Simple Portfolio skeleton (safer version, preserves external symbols)
- *
- * Notes:
- * - Keeps the original global symbols portfolio and count non-static
- *   so other files that reference them won't break.
- * - Improves input safety (fgets + parsing), validation, and string handling.
- * - Does not change any public function names or signatures.
- */
-
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
